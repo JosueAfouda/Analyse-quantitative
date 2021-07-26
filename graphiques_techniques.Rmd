@@ -187,3 +187,5 @@ chartSeries(
 **How is an EMA calculated?**
 
 use a weighted average that gives greater importance to more recent days to make it more responsive to new information.  
+
+# Bon travail Josué
