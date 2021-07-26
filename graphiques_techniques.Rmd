@@ -1,0 +1,417 @@
+---
+title: "Graphiques pour l'Analyse technique des Actifs financiers"
+author: "Josue Afouda"
+date: "26/07/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(quantmod)
+library(PerformanceAnalytics)
+library(RColorBrewer)
+library(tseries)
+library(lubridate)
+library(Quandl)
+Quandl.api_key("7jthmmLEd2yYWJU_tjf1")
+options("getSymbols.warning4.0"=FALSE)
+```
+
+
+# Get Data
+
+```{r}
+# get MSFT Data
+
+msft <- getSymbols("MSFT", auto.assign = F)
+head(msft)
+```
+
+
+```{r}
+# Tesla Daily Returns
+
+tsla <- getSymbols("TSLA", auto.assign = F)
+
+tsla_daily_returns <- dailyReturn(tsla$TSLA.Adjusted)
+
+head(tsla_daily_returns)
+```
+
+# Charting
+
+## Line Graph
+
+```{r}
+chartSeries(
+  msft,
+  # type : "auto", "candlesticks", "matchsticks", "bars","line"
+  type = "line",
+  subset = "2020",
+  theme = chartTheme("white")
+)
+```
+
+
+## Bar  Chart
+
+```{r}
+chartSeries(
+  msft,
+  type = "bar",
+  subset = "2020",
+  theme = chartTheme("white")
+)
+```
+
+
+## Candlesticks
+
+```{r}
+chartSeries(
+  msft,
+  type = "candlesticks",
+  subset = "2020",
+  theme = chartTheme("white")
+)
+```
+
+
+## Auto
+
+```{r}
+# Pour zoomer sur une période précise
+chartSeries(
+  msft,
+  type = "auto",
+  subset = "2020-01-01::2020-04-01",
+  theme = chartTheme("white")
+)
+```
+
+
+## Bollinger Bands
+
+
+
+Bollinger Bands consist of a centerline and two price channels (bands) above and below it. The centerline is an [exponential moving average](https://www.investopedia.com/terms/e/ema.asp); the price channels are the standard deviations of the stock being studied. The bands will expand and contract as the [price action](https://www.investopedia.com/terms/p/price-action.asp) of an issue becomes volatile (expansion) or becomes bound into a tight trading pattern (contraction).  
+
+
+
+
+```{r}
+chartSeries(
+  msft,
+  subset = "2007",
+  # TA : a vector of technical indicators and params, or character strings
+  TA = "addBBands(n = 20, sd = 2)", # n=20 : moyenne mobile sur 20 jours, Simple Moving Average SMA
+  theme = chartTheme("white") # "black" aussi
+)
+```
+
+* n	: number of moving average periods
+
+* sd : number of standard deviations
+
+Voir documentation (?addBBands)
+
+
+# RSI
+
+
+```{r, echo=FALSE, fig.cap="A Caption", out.width='100%'}
+knitr::include_graphics('rsi.png')
+```
+
+
+```{r}
+chartSeries(
+  msft,
+  subset = "2007",
+  # TA : a vector of technical indicators and params, or character strings
+  TA = c(addBBands(n = 20, sd = 2), addRSI()),
+  theme = chartTheme("white")
+)
+```
+
+
+```{r}
+# Pour 2020
+
+chartSeries(
+  msft,
+  subset = "2020",
+  # TA : a vector of technical indicators and params, or character strings
+  TA = c(addBBands(n = 20, sd = 2), addRSI()),
+  theme = chartTheme("white")
+)
+```
+
+# MACD (Moving Average Convergence Divergence)
+
+
+```{r, echo=FALSE, fig.cap="A Caption", out.width='100%'}
+knitr::include_graphics('macd.png')
+```
+
+
+```{r}
+chartSeries(
+  msft,
+  subset = "2007",
+  # TA : a vector of technical indicators and params, or character strings
+  TA = c(addBBands(n = 20, sd = 2), addRSI(), addMACD()),
+  theme = chartTheme("white")
+)
+```
+
+
+
+# Add Exponentiel Moving Average
+
+```{r}
+chartSeries(
+  msft,
+  subset = "2007",
+  # TA : a vector of technical indicators and params, or character strings
+  TA = c(addBBands(n = 20, sd = 2), addRSI(), addEMA(n = 30), addMACD()),
+  theme = chartTheme("white")
+)
+```
+
+
+
+How is an EMA calculated?
+
+use a weighted average that gives greater importance to more recent days to make it more responsive to new information.  
+
+
+# **Projet guidé : Data Analytics:  Build a Stock Buy Signal using R and the Quantmod Package**
+
+
+```{r}
+tsla_cl <- tsla$TSLA.Close
+head(tsla_cl)
+```
+
+```{r}
+tsla_cl2 <- Ad(tsla)
+
+head(tsla_cl2)
+```
+
+```{r}
+# Lag décale les valeurs d'une série
+head(Lag(tsla_cl, 1))
+```
+
+
+```{r}
+head(Lag(tsla_cl, 2))
+```
+
+```{r}
+options(scipen = 9999)
+```
+
+
+```{r}
+# Create daily % change Vector
+
+daily_change <- tsla_cl/Lag(tsla_cl, 1) - 1 # % price change
+
+head(daily_change)
+```
+
+
+```{r}
+# Look at Histogram of Percentage Change
+
+hist(daily_change, 40, col = "green")
+```
+
+
+```{r}
+buy_signal <- 0.04 # threshold (seuil)
+```
+
+```{r}
+signal <- c(NULL) # first date has no signal
+```
+
+
+```{r}
+# Loop over all trading days (except the first)
+
+for (i in 2:length(tsla_cl)) {
+  if (daily_change[i] > buy_signal) {
+    signal[i] <- 1
+  } else {
+    signal[i] <- 0
+  }
+}
+
+head(signal, 40)
+```
+
+```{r}
+# Reclassify signal data to an xts object (tying it to a date)
+
+signal <- reclass(signal, tsla_cl)
+
+print(class(signal))
+
+head(signal)
+```
+
+```{r}
+chartSeries(
+  tsla_cl,
+  subset = "2011-01::2012-01",
+  theme = chartTheme("black")
+)
+```
+
+
+```{r}
+chartSeries(
+  tsla_cl,
+  subset = "2011-01::2012-01",
+  theme = chartTheme("black")
+)
+# Add signal lines to see how the model performs
+addTA(signal, type = "s", col = "red")
+```
+
+
+Globalement le modèle (Signal buy/sell) fonctionne bien.
+
+
+# Projet guidé : Create a Buy Signal using RSI in R with the Quantmod Package
+
+
+```{r}
+# Calculate the daily Percentage change on filter
+
+trade <- Lag(signal, 1)
+
+ret <- dailyReturn(tsla) * trade #dailyReturs() i for Adjusted close price
+
+names(ret) <- "simple filter"
+
+charts.PerformanceSummary(ret, main = "Simple Filter")
+```
+
+
+```{r}
+getSymbols("TSLA")
+head(TSLA)
+```
+
+
+```{r}
+price <- Cl(TSLA)
+
+day <- 14
+
+signal_tsla <- c(0)
+
+rsi <- RSI(price, day)
+```
+
+
+```{r}
+head(rsi, 50)
+```
+
+A partir de ces données *rsi*, on va construire un modèle (signal d'achat/vente).
+
+
+```{r}
+signal_tsla[1:day+1] <- 0
+seuil <- 30 # Essayez aussi 50
+for (i in (day+1):length(price)) {
+  if (rsi[i] < seuil) {
+    signal_tsla[i] <- 1
+  } else {
+    signal_tsla[i] <- 0
+  }
+}
+```
+
+
+```{r}
+head(signal_tsla, 50)
+```
+
+```{r}
+signal_tsla <- reclass(signal_tsla, Cl(TSLA))
+
+head(signal_tsla, 50)
+```
+
+
+```{r}
+trade2 <- Lag(signal_tsla) 
+ret2 <- dailyReturn(TSLA) * trade2
+```
+
+
+```{r}
+head(ret2, 50)
+```
+
+
+```{r}
+names(ret2) <- "RSI"
+retcomb <- cbind(ret, ret2)
+head(retcomb, 50)
+```
+
+```{r}
+charts.PerformanceSummary(retcomb, main = "Simple Filter vs RSI")
+```
+
+
+# Projet guidé :
+
+```{r}
+
+# Importation des données de plusieurs titres 
+
+goog <- getSymbols("GOOG", auto.assign = F)
+
+ibm <- getSymbols("IBM", auto.assign = F)
+```
+
+
+```{r}
+# Extraire les prix ajustés de clôture de chaque titre pour en former un seul ensemble de données xts
+
+ad_close_prices_ret <- merge(dailyReturn(goog$GOOG.Adjusted), 
+                        dailyReturn(ibm$IBM.Adjusted), 
+                        all = F)
+
+# Affichage des premières observations
+
+head(ad_close_prices_ret)
+```
+
+```{r}
+summary(ad_close_prices_ret)
+```
+
+
+
+```{r}
+charts.PerformanceSummary(ad_close_prices_ret, main = 'GOOG vs IBM')
+```
+
+
+```{r}
+table.AnnualizedReturns(ad_close_prices_ret, scale = 252, Rf = 0.004/252)
+```
+
